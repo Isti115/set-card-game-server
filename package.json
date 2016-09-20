@@ -1,0 +1,22 @@
+{
+  "name": "set-card-game-server",
+  "version": "0.0.1",
+  "description": "Server for set-card-game-web.",
+  "main": "app/app.js",
+  "scripts": {
+    "rollup": "rollup --config",
+    "rollup:mon": "nodemon --watch src --exec npm run rollup",
+    "rollup:start": "rollup --config && node app/app.js",
+    "rollup:start:mon": "nodemon --watch src --exec npm run rollup:start",
+    "start": "node app/app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Isti115",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.14.0",
+    "express-ws": "^2.0.0",
+    "mongodb": "^2.2.10",
+    "rollup": "^0.36.0"
+  }
+}
