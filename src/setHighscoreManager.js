@@ -18,15 +18,8 @@ class SetHighscoreManager {
   clientRequested (ws) {
     console.log('requested')
 
-    this.sendScores(ws)
-
-    ws.on('message', (msg) => {
-      this.clientMessaged(ws, msg)
-    })
-
-    ws.on('close', () => {
-      this.clientClosed(ws)
-    })
+    ws.on('message', (msg) => this.clientMessaged(ws, msg))
+    ws.on('close', () => this.clientClosed(ws))
   }
 
   clientMessaged (ws, msg) {
@@ -41,38 +34,64 @@ class SetHighscoreManager {
         score: message.data.score,
         date: new Date()
       })
+    } else if (message.type === 'batchScores') {
+      for (const score of message.data) {
+        this.scores.insert({
+          name: score.name,
+          score: score.score,
+          date: new Date()
+        })
+      }
+    } else if (message.type === 'scoreRequest') {
+      this.sendScores(ws)
     }
-
-    this.sendScores(ws)
   }
 
   clientClosed (ws) {
     console.log('closed')
   }
 
+  getScores () {
+    return Promise.all([
+      new Promise((resolve, reject) => {
+        this.scores.find({}, { name: 1, score: 1, _id: 0 })
+          .sort({score: -1}).limit(10).toArray((err, data) => {
+          resolve({ type: 'globalScores', data: data })
+        })
+      }),
+      new Promise((resolve, reject) => {
+        const date = new Date()
+
+        const year = date.getFullYear()
+        const month = date.getMonth() + 1
+        const day = date.getDate()
+        const paddedMonth = month < 10 ? '0' + month : month
+        const paddedDay = day < 10 ? '0' + day : day
+
+        const dayBegin = new Date(`${year}-${paddedMonth}-${paddedDay}T00:00:00+0200`)
+        const dayEnd = new Date(`${year}-${paddedMonth}-${paddedDay}T24:00:00+0200`)
+
+        this.scores.find({ date: { $gt: dayBegin, $lt: dayEnd } }, { name: 1, score: 1, _id: 0 })
+          .sort({score: -1}).limit(10).toArray((err, data) => {
+          resolve({ type: 'dailyScores', data: data })
+        })
+      }),
+      new Promise((resolve, reject) => {
+        this.scores.aggregate([{$group: {_id: '$name', maxScore: {$max: '$score'}}}])
+          .sort({maxScore: -1}).limit(10).toArray((err, data) => {
+          resolve({ type: 'personalScores', data: data.map(score => ({name: score._id, score: score.maxScore})) })
+        })
+      })
+    ])
+  }
+
   sendScores (ws) {
-    this.scores.find({}, { name: 1, score: 1, _id: 0 })
-      .sort({score: -1}).limit(10).toArray((err, data) => {
+    this.getScores().then(scoresByType => {
       ws.send(JSON.stringify({
-        type: 'globalScores',
-        data: data
+        type: 'scoresByType',
+        data: scoresByType
       }))
     })
-
-    // const date = new Date()
-    // const dayBegin = new Date(`${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}T00:00:00+0200`)
-    // const dayEnd = new Date(`${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}T24:00:00+0200`)
-    //
-    // this.scores.find({ date: { $gt: dayBegin, $lt: dayEnd } }, { name: 1, score: 1, _id: 0 })
-    //   .sort({score: -1}).limit(10).toArray((err, data) => {
-    //   ws.send(JSON.stringify({
-    //     type: 'dailyScores',
-    //     data: data
-    //   }))
-    // })
-
-  // db.scores.group({key: {name: 1}, initial: {max: 0},reduce: function(curr, result) {if(result.max < curr.score){result.max = curr.score}}})
-  // db.scores.aggregate([{$group: {_id: '$name', maxScore: {$max: '$score'}}}])
   }
 }
 
