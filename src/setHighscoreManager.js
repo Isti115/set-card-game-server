@@ -34,14 +34,18 @@ class SetHighscoreManager {
         score: message.data.score,
         date: new Date()
       })
-    } else if (message.type === 'batchScores') {
+    } else if (message.type === 'queuedScores') {
       for (const score of message.data) {
         this.scores.insert({
           name: score.name,
           score: score.score,
-          date: new Date()
+          date: new Date(score.date)
         })
       }
+
+      ws.send(JSON.stringify({
+        type: 'scoresAcknowledged'
+      }))
     } else if (message.type === 'scoreRequest') {
       this.sendScores(ws)
     }
